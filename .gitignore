@@ -5,6 +5,10 @@
 data/
 models/
 
+# ---> Results
+reports/
+report/
+
 # ---> Python
 # Byte-compiled / optimized / DLL files
 __pycache__/
