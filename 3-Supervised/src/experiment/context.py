@@ -29,8 +29,11 @@ class PipelineContext:
         dimensionality_reducer (Any): Fitted PCA reducer produced by the pipeline.
         pca_explained_variance (Any): Total variance retained by the PCA
             components (``None`` when PCA is disabled).
+        model_runs (dict[str, list[dict[str, Any]]]): Mapping of model names to
+            lists of run dictionaries. Each run dict contains 'run', 'seed',
+            'model', and 'train_time' keys.
         fitted_models (dict[str, Any]): Mapping of model names to fitted model
-            instances produced by the training stage.
+            instances (first run of each model, for backward compatibility).
         best_model_name (str | None): Name of the best model determined by the
             comparison stage.
         comparison_metrics (Any): Comparison table (DataFrame) from the
@@ -47,6 +50,7 @@ class PipelineContext:
     minority_class: Any = field(default=None)
     dimensionality_reducer: Any = field(default=None)
     pca_explained_variance: Any = field(default=None)
+    model_runs: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     fitted_models: dict[str, Any] = field(default_factory=dict)
     best_model_name: str | None = field(default=None)
     comparison_metrics: Any = field(default=None)

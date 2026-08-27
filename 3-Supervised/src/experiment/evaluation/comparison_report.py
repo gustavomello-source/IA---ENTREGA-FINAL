@@ -1,26 +1,26 @@
 """
 Comparison report generation for the experiment pipeline.
 
-The :class:`ComparisonReport` aggregates metrics across all fitted models,
-builds a comparison table, identifies the best model, and writes summary
-artifacts to the report folder.
+The :class:`ComparisonReport` aggregates metrics across all model runs,
+computes mean/std statistics, builds comparison tables, identifies the best
+model, and writes summary artifacts to the report folder.
 """
 
+import numpy as np
+import pandas as pd
 from pathlib import Path
 from typing import Any
-
-import pandas as pd
 
 
 class ComparisonReport:
     """
-    Aggregate and report model comparison results.
+    Aggregate and report model comparison results from multiple runs.
 
     Attributes:
         output_folder (Path): Directory where comparison artifacts are saved.
         logger (Any): Optional logger for progress messages.
-        metrics_data (list[dict]): Collected metrics for all models.
-        metrics_table (pd.DataFrame | None): Comparison table (built on save).
+        per_run_data (dict[str, list[dict]]): Per-run metrics for each model.
+        metrics_table (pd.DataFrame | None): Aggregated comparison table (mean/std).
     """
 
     def __init__(self, output_folder: Path, logger: Any = None) -> None:
@@ -34,7 +34,7 @@ class ComparisonReport:
         """
         self.output_folder = output_folder
         self.logger = logger
-        self.metrics_data: list[dict[str, Any]] = []
+        self.per_run_data: dict[str, list[dict[str, Any]]] = {}
         self.metrics_table: pd.DataFrame | None = None
 
     def _log(self, message: str) -> None:
@@ -47,36 +47,86 @@ class ComparisonReport:
         if self.logger is not None:
             self.logger.info(message)
 
-    def add_model_metrics(self, model_name: str, metrics: dict[str, Any]) -> None:
+    def add_model_runs(self, model_name: str, run_metrics: list[dict[str, Any]]) -> None:
         """
-        Add a model's metrics to the comparison.
+        Add all runs for a model to the comparison.
 
         Args:
             model_name (str): Model name.
-            metrics (dict[str, Any]): Metrics dictionary from
-                :meth:`ModelEvaluator.evaluate`.
+            run_metrics (list[dict[str, Any]]): List of metrics dicts, one per run.
         """
-        self.metrics_data.append(metrics)
+        self.per_run_data[model_name] = run_metrics
+
+    def _compute_aggregated_metrics(
+        self, run_metrics: list[dict[str, Any]]
+    ) -> dict[str, float]:
+        """
+        Compute mean and std across runs for numeric metrics.
+
+        Args:
+            run_metrics (list[dict[str, Any]]): List of per-run metric dicts.
+
+        Returns:
+            dict[str, float]: Aggregated metrics with keys like
+                ``accuracy_mean``, ``accuracy_std``, etc.
+        """
+        # Metrics to aggregate
+        metric_keys = [
+            "accuracy",
+            "precision_minority",
+            "recall_minority",
+            "f1_minority",
+            "precision_macro",
+            "recall_macro",
+            "f1_macro",
+            "roc_auc",
+            "false_positives",
+            "false_negatives",
+            "total_errors",
+            "train_time",
+            "predict_time",
+        ]
+
+        aggregated = {}
+        for key in metric_keys:
+            values = [m[key] for m in run_metrics if key in m]
+            if values:
+                aggregated[f"{key}_mean"] = float(np.mean(values))
+                aggregated[f"{key}_std"] = float(np.std(values, ddof=1) if len(values) > 1 else 0.0)
+
+        return aggregated
 
     def save(self) -> None:
         """
-        Build the comparison table and write all comparison artifacts.
+        Build aggregated and per-run tables, write all comparison artifacts.
 
         Writes:
-        - ``comparison/metrics_table.csv``
-        - ``comparison/metrics_table.json``
-        - ``comparison/summary.txt``
+        - ``comparison/metrics_table_aggregated.csv``: Mean ± std per model
+        - ``comparison/metrics_per_run.csv``: Long-format table with all runs
+        - ``comparison/summary.txt``: Text summary with best model
         """
-        if not self.metrics_data:
-            self._log("No model metrics to compare. Skipping comparison save.")
+        if not self.per_run_data:
+            self._log("No model runs to compare. Skipping comparison save.")
             return
 
-        # Build comparison table
-        table_rows = []
-        for metrics in self.metrics_data:
-            table_rows.append(
-                {
-                    "model": metrics["model_name"],
+        # Build aggregated table (mean/std)
+        aggregated_rows = []
+        for model_name, run_metrics in self.per_run_data.items():
+            agg = self._compute_aggregated_metrics(run_metrics)
+            agg["model"] = model_name
+            agg["n_runs"] = len(run_metrics)
+            aggregated_rows.append(agg)
+
+        self.metrics_table = pd.DataFrame(aggregated_rows).set_index("model")
+
+        # Build per-run table (long format)
+        per_run_rows = []
+        for model_name, run_metrics in self.per_run_data.items():
+            for metrics in run_metrics:
+                row = {
+                    "model": model_name,
+                    "run": metrics["run"],
+                    "seed": metrics["seed"],
                     "accuracy": metrics["accuracy"],
                     "precision_minority": metrics["precision_minority"],
                     "recall_minority": metrics["recall_minority"],
@@ -88,43 +138,73 @@ class ComparisonReport:
                     "false_positives": metrics["false_positives"],
                     "false_negatives": metrics["false_negatives"],
                     "total_errors": metrics["total_errors"],
+                    "train_time": metrics["train_time"],
+                    "predict_time": metrics["predict_time"],
                 }
-            )
-        self.metrics_table = pd.DataFrame(table_rows).set_index("model")
+                per_run_rows.append(row)
 
-        # Save CSV and JSON
-        csv_path = self.output_folder / "metrics_table.csv"
-        json_path = self.output_folder / "metrics_table.json"
-        self.metrics_table.to_csv(csv_path)
-        self.metrics_table.to_json(json_path, orient="index", indent=2)
-        self._log(f"Comparison table saved to {csv_path} and {json_path}.")
+        per_run_table = pd.DataFrame(per_run_rows)
 
-        # Identify best model by primary metric (f1_macro)
-        best_model, best_score = self.get_best_model(metric="f1_macro")
+        # Save aggregated table
+        agg_csv_path = self.output_folder / "metrics_table_aggregated.csv"
+        self.metrics_table.to_csv(agg_csv_path)
+        self._log(f"Aggregated metrics table saved to {agg_csv_path}.")
+
+        # Save per-run table
+        per_run_csv_path = self.output_folder / "metrics_per_run.csv"
+        per_run_table.to_csv(per_run_csv_path, index=False)
+        self._log(f"Per-run metrics table saved to {per_run_csv_path}.")
+
+        # Identify best model by primary metric (f1_macro_mean)
+        best_model, best_score = self.get_best_model(metric="f1_macro_mean")
 
         # Write summary
         summary_path = self.output_folder / "summary.txt"
         with summary_path.open("w") as f:
-            f.write("Model Comparison Summary\n")
-            f.write("=" * 50 + "\n\n")
-            f.write(f"Best Model (by F1 macro class): {best_model}\n")
-            f.write(f"  F1 Score (macro): {best_score:.4f}\n\n")
-            f.write("Per-Model Metrics:\n")
-            f.write("-" * 50 + "\n")
-            for _, row in self.metrics_table.iterrows():
-                f.write(f"\nModel: {row.name}\n")
-                f.write(f"  Accuracy:           {row['accuracy']:.4f}\n")
-                f.write(f"  Precision (minor):  {row['precision_minority']:.4f}\n")
-                f.write(f"  Recall (minor):     {row['recall_minority']:.4f}\n")
-                f.write(f"  F1 (minor):         {row['f1_minority']:.4f}\n")
-                f.write(f"  F1 (macro):         {row['f1_macro']:.4f}\n")
-                f.write(f"  ROC-AUC:            {row['roc_auc']:.4f}\n")
-                f.write(f"  False Positives:    {int(row['false_positives'])}\n")
-                f.write(f"  False Negatives:    {int(row['false_negatives'])}\n")
-                f.write(f"  Total Errors:       {int(row['total_errors'])}\n")
+            f.write("Model Comparison Summary (Multi-Run)\n")
+            f.write("=" * 60 + "\n\n")
+            f.write(f"Best Model (by F1 macro mean): {best_model}\n")
+            f.write(f"  F1 Score (macro, mean): {best_score:.4f}\n\n")
+            f.write("Per-Model Aggregated Metrics (mean ± std):\n")
+            f.write("-" * 60 + "\n")
+            for model_idx, row in self.metrics_table.iterrows():
+                f.write(f"\nModel: {model_idx} ({int(row['n_runs'])} runs)\n")
+                f.write(
+                    f"  Accuracy:           {row['accuracy_mean']:.4f} ± {row['accuracy_std']:.4f}\n"
+                )
+                f.write(
+                    f"  Precision (minor):  {row['precision_minority_mean']:.4f} ± {row['precision_minority_std']:.4f}\n"
+                )
+                f.write(
+                    f"  Recall (minor):     {row['recall_minority_mean']:.4f} ± {row['recall_minority_std']:.4f}\n"
+                )
+                f.write(
+                    f"  F1 (minor):         {row['f1_minority_mean']:.4f} ± {row['f1_minority_std']:.4f}\n"
+                )
+                f.write(
+                    f"  F1 (macro):         {row['f1_macro_mean']:.4f} ± {row['f1_macro_std']:.4f}\n"
+                )
+                f.write(
+                    f"  ROC-AUC:            {row['roc_auc_mean']:.4f} ± {row['roc_auc_std']:.4f}\n"
+                )
+                f.write(
+                    f"  Train Time (s):     {row['train_time_mean']:.2f} ± {row['train_time_std']:.2f}\n"
+                )
+                f.write(
+                    f"  Predict Time (s):   {row['predict_time_mean']:.4f} ± {row['predict_time_std']:.4f}\n"
+                )
+                f.write(
+                    f"  False Positives:    {row['false_positives_mean']:.1f} ± {row['false_positives_std']:.1f}\n"
+                )
+                f.write(
+                    f"  False Negatives:    {row['false_negatives_mean']:.1f} ± {row['false_negatives_std']:.1f}\n"
+                )
+                f.write(
+                    f"  Total Errors:       {row['total_errors_mean']:.1f} ± {row['total_errors_std']:.1f}\n"
+                )
         self._log(f"Comparison summary saved to {summary_path}.")
 
-    def get_best_model(self, metric: str = "f1_macro") -> tuple[str, float]:
+    def get_best_model(self, metric: str = "f1_macro_mean") -> tuple[str, float]:
         """
         Identify the best model by a given metric.
 
