@@ -3,7 +3,6 @@
 
 # ---> data and models
 data/
-models/
 
 # ---> Results
 reports/
