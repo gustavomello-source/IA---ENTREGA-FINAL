@@ -5,7 +5,10 @@ Experiment orchestration for the pipeline.
 from src.experiment.context import PipelineContext
 from src.experiment.data.dimensionality_reducer import DimensionalityReducer
 from src.experiment.data.preprocessor import Preprocessor
+from src.experiment.evaluation.comparison_report import ComparisonReport
+from src.experiment.evaluation.evaluator import ModelEvaluator
 from src.experiment.metrics import resolve_minority_class
+from src.experiment.models.model_factory import create_model
 
 
 class Experiment:
@@ -36,6 +39,8 @@ class Experiment:
         try:
             self._preprocess()
             self._reduce_dimensionality()
+            self._train_models()
+            self._compare_models()
             logger.info("Experiment pipeline completed successfully.")
 
         except Exception as exc:
@@ -114,3 +119,154 @@ class Experiment:
             f"Test shape: {x_test_reduced.shape}, "
             f"variance retained: {reducer.cumulative_variance_:.4f}."
         )
+
+    def _train_models(self) -> None:
+        """
+        Train all configured models on the processed training split.
+
+        Reads the ``[MODEL] models`` list, instantiates each via the factory,
+        fits on the processed training data, saves the fitted model into a
+        per-model folder under the report directory, and stores fitted
+        instances on the shared context for the comparison stage.
+        """
+        logger = self.context.logger
+        config = self.context.config
+        data_manager = self.context.data_manager
+
+        model_config = config.get_section("MODEL")
+        model_names_raw = model_config.get("models", "")
+        model_names = [
+            name.strip() for name in model_names_raw.split(",") if name.strip()
+        ]
+
+        if not model_names:
+            logger.warning("No models configured in [MODEL] models. Skipping training.")
+            return
+
+        logger.info(f"Training {len(model_names)} model(s): {', '.join(model_names)}.")
+
+        for model_name in model_names:
+            try:
+                model_section_name = model_name.upper()
+                model_cfg = config.get_section(model_section_name)
+                if not model_cfg:
+                    logger.warning(
+                        f"No [{model_section_name}] config section found. "
+                        f"Skipping {model_name}."
+                    )
+                    continue
+
+                model = create_model(model_name, config=model_cfg, logger=logger)
+                model.fit(self.context.X_train_processed, data_manager.y_train)
+                model_folder = self.context.experiment_folder / model_name
+                model_folder.mkdir(parents=True, exist_ok=True)
+                model.save(model_folder / f"{model_name}.joblib")
+                self.context.fitted_models[model_name] = model
+
+            except Exception as exc:
+                logger.error(f"Failed to train {model_name}: {exc}", exc_info=True)
+                raise
+
+        logger.info(
+            f"Model training complete. Fitted models: {list(self.context.fitted_models.keys())}."
+        )
+
+    def _compare_models(self) -> None:
+        """
+        Evaluate all fitted models on the test split and generate comparison reports.
+
+        For each model, computes metrics, plots confusion matrices, performs
+        error analysis, and saves all outputs into per-model folders. Then
+        aggregates metrics into a cross-model comparison table saved to the
+        comparison folder.
+        """
+        logger = self.context.logger
+        data_manager = self.context.data_manager
+
+        if not self.context.fitted_models:
+            logger.warning("No fitted models to compare. Skipping comparison.")
+            return
+
+        logger.info(
+            f"Comparing {len(self.context.fitted_models)} model(s) on test set..."
+        )
+
+        comparison_folder = self.context.experiment_folder / "comparison"
+        comparison_folder.mkdir(parents=True, exist_ok=True)
+
+        evaluator = ModelEvaluator(
+            minority_class=self.context.minority_class, logger=logger
+        )
+        report = ComparisonReport(output_folder=comparison_folder, logger=logger)
+
+        for model_name, model in self.context.fitted_models.items():
+            logger.info(f"Evaluating {model_name}...")
+
+            # Compute metrics
+            metrics = evaluator.evaluate(
+                model=model,
+                X_test=self.context.X_test_processed,
+                y_test=data_manager.y_test,
+            )
+            report.add_model_metrics(model_name, metrics)
+
+            # Per-model folder
+            model_folder = self.context.experiment_folder / model_name
+            model_folder.mkdir(parents=True, exist_ok=True)
+
+            # Save metrics JSON
+            import json
+
+            with (model_folder / "metrics.json").open("w") as f:
+                json.dump(metrics, f, indent=2, default=str)
+
+            # Save classification report
+            with (model_folder / "classification_report.json").open("w") as f:
+                json.dump(metrics["classification_report"], f, indent=2)
+
+            # Save confusion matrices
+            import numpy as np
+
+            cm = np.array(metrics["confusion_matrix"])
+            cm_norm = np.array(metrics["confusion_matrix_normalized"])
+            np.savetxt(
+                model_folder / "confusion_matrix.csv", cm, delimiter=",", fmt="%d"
+            )
+            np.savetxt(
+                model_folder / "confusion_matrix_normalized.csv",
+                cm_norm,
+                delimiter=",",
+                fmt="%.4f",
+            )
+
+            # Plot confusion matrix
+            evaluator.plot_confusion_matrix(
+                cm=metrics["confusion_matrix"],
+                labels=metrics["labels"],
+                model_name=model_name,
+                output_path=model_folder / "confusion_matrix.png",
+            )
+
+            # Error analysis
+            error_analysis = evaluator.analyze_errors(
+                model=model,
+                X_test=self.context.X_test_processed,
+                y_test=data_manager.y_test,
+            )
+            error_analysis["false_positives"].to_csv(
+                model_folder / "errors_false_positives.csv", index=False
+            )
+            error_analysis["false_negatives"].to_csv(
+                model_folder / "errors_false_negatives.csv", index=False
+            )
+
+        # Aggregate comparison
+        report.save()
+        best_model, best_score = report.get_best_model(metric="f1_macro")
+        logger.info(
+            f"Comparison complete. Best model: {best_model} (F1 macro = {best_score:.4f})."
+        )
+
+        # Store for later stages
+        self.context.best_model_name = best_model
+        self.context.comparison_metrics = report.metrics_table

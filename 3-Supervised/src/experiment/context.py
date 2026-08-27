@@ -29,6 +29,12 @@ class PipelineContext:
         dimensionality_reducer (Any): Fitted PCA reducer produced by the pipeline.
         pca_explained_variance (Any): Total variance retained by the PCA
             components (``None`` when PCA is disabled).
+        fitted_models (dict[str, Any]): Mapping of model names to fitted model
+            instances produced by the training stage.
+        best_model_name (str | None): Name of the best model determined by the
+            comparison stage.
+        comparison_metrics (Any): Comparison table (DataFrame) from the
+            comparison stage.
     """
 
     config: ConfigReader
@@ -41,6 +47,9 @@ class PipelineContext:
     minority_class: Any = field(default=None)
     dimensionality_reducer: Any = field(default=None)
     pca_explained_variance: Any = field(default=None)
+    fitted_models: dict[str, Any] = field(default_factory=dict)
+    best_model_name: str | None = field(default=None)
+    comparison_metrics: Any = field(default=None)
 
 
 def save_context_snapshot(context: PipelineContext) -> None:
