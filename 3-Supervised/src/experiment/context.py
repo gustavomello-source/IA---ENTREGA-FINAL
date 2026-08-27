@@ -4,7 +4,7 @@ including configuration, logger, experiment folder, selected stages, and artifac
 exchanged between stages.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -22,9 +22,37 @@ class PipelineContext:
         logger (Any): Logger instance for logging messages.
         experiment_folder (Path): Path to the experiment folder.
         data_manager (DataManager): Data manager for handling the dataset.
+        preprocessor (Any): Fitted preprocessor produced by the pipeline.
+        X_train_processed (Any): Transformed training features.
+        X_test_processed (Any): Transformed testing features.
+        minority_class (Any): Minority class label for the primary metric.
+        dimensionality_reducer (Any): Fitted PCA reducer produced by the pipeline.
+        pca_explained_variance (Any): Total variance retained by the PCA
+            components (``None`` when PCA is disabled).
     """
 
     config: ConfigReader
     logger: Any
     data_manager: DataManager
     experiment_folder: Path
+    preprocessor: Any = field(default=None)
+    X_train_processed: Any = field(default=None)
+    X_test_processed: Any = field(default=None)
+    minority_class: Any = field(default=None)
+    dimensionality_reducer: Any = field(default=None)
+    pca_explained_variance: Any = field(default=None)
+
+
+def save_context_snapshot(context: PipelineContext) -> None:
+    """
+    Save a snapshot of the current context to a file.
+
+    Args:
+        context (PipelineContext): The pipeline context to snapshot.
+    """
+    snapshot_path = context.experiment_folder / "context_snapshot.txt"
+    with Path.open(snapshot_path, "w") as f:
+        f.write(f"Configuration: {context.config}\n")
+        f.write(f"Experiment Folder: {context.experiment_folder}\n")
+        f.write(f"Data Manager: {context.data_manager}\n")
+        f.write(f"Context: {context}\n")

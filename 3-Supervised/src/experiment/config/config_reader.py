@@ -39,3 +39,18 @@ class ConfigReader:
         except Exception as e:
             print(f"Error reading config file: {e}")
             raise
+
+    def get_section(self, section: str) -> dict[str, str]:
+        """
+        Return the key/value pairs of a single configuration section.
+
+        Args:
+            section (str): Name of the configuration section to read.
+
+        Returns:
+            dict[str, str]: Mapping of option names to their raw string values.
+            An empty dictionary is returned when the section is absent.
+        """
+        if not self.config.has_section(section):
+            return {}
+        return dict(self.config.items(section))

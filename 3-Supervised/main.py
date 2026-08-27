@@ -1,7 +1,7 @@
 from typing import Any
 
 from src.experiment.config.config_reader import ConfigReader
-from src.experiment.context import PipelineContext
+from src.experiment.context import PipelineContext, save_context_snapshot
 from src.experiment.data.data_manager import DataManager
 from src.experiment.experiment import Experiment
 from src.utils.logging_utils import setup_logging
@@ -26,11 +26,7 @@ def main() -> None:
     data_manager.split_data(
         target_column=config.get("DATA", {}).get("target_column", "Y")
     )
-    data_manager.save_data_ids(
-        output_path=config.get("DATA", {}).get(
-            "data_ids_output_path", "./data/processed/data_ids.csv"
-        )
-    )
+    data_manager.save_data_ids(output_path=experiment_folder / "data_ids")
     data_manager.clear_raw_data()
 
     context = PipelineContext(
@@ -43,11 +39,13 @@ def main() -> None:
     experiment = Experiment(context)
     experiment.run()
 
+    logger.info("Experiment completed successfully.")
+
     # end of experiment
+    logger.info("Saving context snapshot.")
+    save_context_snapshot(context)
     logger.info("Cleaning up temporary files.")
     remove_temp_files(temp_file_names=["__pycache__/"])
-
-    logger.info("Experiment completed successfully.")
 
 
 if __name__ == "__main__":
