@@ -66,7 +66,6 @@ Abaixo segue o que foi utilizado na criação e preparação do ambiente de dese
 - [XGBoost](https://xgboost.readthedocs.io/) - Gradient boosting otimizado.
 - [LightGBM](https://lightgbm.readthedocs.io/) - Gradient boosting rápido para grandes datasets.
 - [CatBoost](https://catboost.ai/) - Gradient boosting robusto para dados categóricos.
-- [imbalanced-learn](https://imbalanced-learn.org/) - Ferramentas para dados desbalanceados (SMOTE).
 - [Matplotlib](https://matplotlib.org/) - Biblioteca para visualização de dados.
 - [Seaborn](https://seaborn.pydata.org/) - Visualizações estatísticas.
 - [Joblib](https://joblib.readthedocs.io/) - Serialização eficiente de objetos Python.
