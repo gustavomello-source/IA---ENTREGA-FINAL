@@ -102,7 +102,7 @@ A estrutura de arquivos está da seguinte maneira:
 1. Para instalar e utilizar esse projeto, basta clonar o repositório:
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
+git clone https://github.com/gustavomello-source/IA---ENTREGA-FINAL
 cd 2-TSP
 ```
 

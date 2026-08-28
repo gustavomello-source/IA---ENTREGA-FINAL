@@ -404,3 +404,59 @@ Após a execução, os principais arquivos de saída são:
 3. **`report/.../comparison/plots/`**: Gráficos de distribuição (boxplots mostram variabilidade entre runs).
 4. **`report/.../[ModelName]/confusion_matrix.png`**: Visualização da matriz de confusão.
 5. **`report/.../[ModelName]/errors_false_positives.csv` e `errors_false_negatives.csv`**: IDs das amostras classificadas incorretamente para análise de erros.
+
+## Otimização de Hiperparâmetros (XGBoost)
+
+### Script de Otimização
+
+O projeto inclui um script adicional para otimização de hiperparâmetros do modelo XGBoost:
+
+```bash
+python optimize_xgboost.py
+```
+
+### O que o Script Faz
+
+O script `optimize_xgboost.py` realiza uma busca extensiva de hiperparâmetros usando os **mesmos dados e preprocessamento** de um experimento anterior:
+
+1. **Carrega os dados do experimento especificado** em `config.ini` (seção `[OPTIMIZATION]`, parâmetro `experiment_id`)
+2. **Aplica o mesmo preprocessamento e PCA** usado no pipeline principal
+3. **Executa RandomizedSearchCV** (50 iterações, 3-fold CV) testando 9 hiperparâmetros:
+   - `n_estimators`: [50, 100, 200, 300]
+   - `max_depth`: [3, 5, 6, 8, 10]
+   - `learning_rate`: [0.01, 0.05, 0.1, 0.2]
+   - `subsample`: [0.6, 0.7, 0.8, 0.9, 1.0]
+   - `colsample_bytree`: [0.7, 0.8, 0.9, 1.0]
+   - `gamma`: [0, 0.1, 0.2, 0.5]
+   - `reg_alpha`: [0, 0.01, 0.1, 1]
+   - `reg_lambda`: [1, 5, 10]
+   - `min_child_weight`: [1, 3, 5, 7]
+4. **Treina 10 runs** com os melhores hiperparâmetros encontrados (seeds 1-10)
+5. **Compara com o baseline** (XGBoost com parâmetros padrão do experimento)
+6. **Gera relatório visual** com boxplot comparativo
+
+
+### Arquivos de Saída
+
+Os resultados são salvos em `optimize_xgboost_output/`:
+
+```
+optimize_xgboost_output/
+├── best_params.json                          # Melhores hiperparâmetros encontrados
+├── gridsearch_results.csv                    # Todas as 50 combinações testadas com seus scores
+├── xgboost_optimization_comparison.png       # Boxplot: Baseline vs Optimized (F1-macro)
+├── optimization_report.txt                   # Resumo textual com % de melhora
+└── optimized_runs/
+    ├── run_1.json                            # Métricas detalhadas do run 1
+    ├── run_2.json
+    └── ...
+```
+
+### Configuração
+
+Edite o `config.ini` na seção `[OPTIMIZATION]`:
+
+```ini
+[OPTIMIZATION]
+experiment_id = experiment_20260827_170446  # ID do experimento cujos dados serão usados
+```
