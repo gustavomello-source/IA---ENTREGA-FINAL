@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.experiment.config.config_reader import ConfigReader
-from src.experiment.data.data_manager import DataManager
+from src.experiment.data_handling.data_manager import DataManager
 
 
 @dataclass

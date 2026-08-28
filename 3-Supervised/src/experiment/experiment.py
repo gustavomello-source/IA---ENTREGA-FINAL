@@ -8,8 +8,8 @@ import time
 import numpy as np
 
 from src.experiment.context import PipelineContext
-from src.experiment.data.dimensionality_reducer import DimensionalityReducer
-from src.experiment.data.preprocessor import Preprocessor
+from src.experiment.data_handling.dimensionality_reducer import DimensionalityReducer
+from src.experiment.data_handling.preprocessor import Preprocessor
 from src.experiment.evaluation.comparison_plots import ComparisonPlots
 from src.experiment.evaluation.comparison_report import ComparisonReport
 from src.experiment.evaluation.evaluator import ModelEvaluator

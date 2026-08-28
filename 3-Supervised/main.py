@@ -2,7 +2,7 @@ from typing import Any
 
 from src.experiment.config.config_reader import ConfigReader
 from src.experiment.context import PipelineContext, save_context_snapshot
-from src.experiment.data.data_manager import DataManager
+from src.experiment.data_handling.data_manager import DataManager
 from src.experiment.experiment import Experiment
 from src.utils.logging_utils import setup_logging
 from src.utils.remove_temp_files import remove_temp_files
