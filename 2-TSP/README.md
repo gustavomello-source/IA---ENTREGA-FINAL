@@ -17,6 +17,7 @@
   - [Configuração do Ambiente Virtual](#configuração-do-ambiente-virtual)
     - [Linux/Ubuntu](#linuxubuntu)
     - [Windows (Command Prompt)](#windows-command-prompt)
+  - [Disposição dos dados](#disposição-dos-dados)
   - [Configuração do arquivo config.ini](#configuração-do-arquivo-configini)
   - [Execução](#execução)
     - [Linux/Ubuntu](#linuxubuntu-1)
@@ -57,6 +58,7 @@ Para começar a utilizar este projeto, é necessário ter alguns pré-requisitos
 1. A utilização do ambiente requer a instalação do Python 3.11 ou superior. Para instalá-lo, acesse o site oficial do [Python](https://www.python.org/downloads/) e siga as instruções de instalação para o seu sistema operacional.
 2. A documentação de cada biblioteca aqui utilizada pode ser encontrada nos links fornecidos em [Feito Com](#feito-com).
 3. Foi desenvolvido e testado em sistemas Windows e Linux, então recomenda-se tais sistemas operacionais para melhor compatibilidade.
+4. Dados de instâncias TSPLIB, dispostos dentro de uma pasta chamada `data/` no diretório raiz do projeto, as quais podem ser obtidas no site oficial do [TSPLIB](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/).
 
 ### Estrutura de Arquivos
 
@@ -136,6 +138,10 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+### Disposição dos dados
+É necessário que os dados das instâncias TSPLIB estejam dispostos dentro de uma pasta chamada `data/` no diretório raiz do projeto. As instâncias podem ser obtidas no site oficial do [TSPLIB](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/).
+Os dados devem estar no formato `.tsp` e, caso haja tours de referência, no formato `.opt.tour`.
+
 ### Configuração do arquivo config.ini
 
 Antes de executar o algoritmo, configure o arquivo `config/config.ini` com os parâmetros desejados:
@@ -152,6 +158,7 @@ random_seed = 1
 
 [TSP]
 dataset = data/att48.tsp
+tour_file = data/att48.opt.tour
 ```
 
 As principais configurações são:
@@ -174,7 +181,7 @@ Para executar o projeto no ambiente virtual, ative o ambiente e execute o módul
 ```bash
 source .venv/bin/activate
 
-python -m src.main
+python3 -m src.main
 ```
 
 #### Windows (Command Prompt)

@@ -40,8 +40,14 @@ Isso representa um tabuleiro **8 × 8** e o problema das **8-Rainhas**.
 
 Se o arquivo se chamar `input.txt` e estiver na mesma pasta do `main.py`, execute:
 
+#### Windows (Command Prompt):
 ```bash
 python main.py
+```
+
+#### Linux/Ubuntu:
+```bash
+python3 main.py
 ```
 
 Caso nenhum arquivo seja informado, o programa tentará utilizar automaticamente:

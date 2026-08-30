@@ -18,6 +18,7 @@
   - [Configuração do Ambiente Virtual](#configuração-do-ambiente-virtual)
     - [Linux/Ubuntu](#linuxubuntu)
     - [Windows (Command Prompt)](#windows-command-prompt)
+  - [Disposição dos dados](#disposição-dos-dados)
   - [Configuração do arquivo config.ini](#configuração-do-arquivo-configini)
     - [Seção \[LOG\]](#seção-log)
     - [Seção \[DATA\]](#seção-data)
@@ -35,6 +36,11 @@
     - [Arquivos na raiz](#arquivos-na-raiz)
     - [Pasta `report/`](#pasta-report)
 - [Interpretando os Resultados](#interpretando-os-resultados)
+- [Otimização de Hiperparâmetros (XGBoost)](#otimização-de-hiperparâmetros-xgboost)
+  - [Script de Otimização](#script-de-otimização)
+  - [O que o Script Faz](#o-que-o-script-faz)
+  - [Arquivos de Saída](#arquivos-de-saída)
+  - [Configuração](#configuração)
 
 <!-- ABOUT THE PROJECT -->
 
@@ -174,6 +180,10 @@ python -m venv .venv
 
 pip install -r requirements.txt
 ```
+
+### Disposição dos dados
+É necessário que os dados estejam dispostos dentro de uma pasta chamada `data/raw/` no diretório raiz do projeto. O arquivo `config.ini` deve apontar para o dataset desejado dentro da pasta `data/raw/` e a coluna target deve ser especificada na seção `[DATA]` do arquivo `config.ini`.
+
 ### Configuração do arquivo config.ini
 
 Antes de executar o treinamento, configure o arquivo `config.ini` com os parâmetros desejados. O arquivo está organizado em seções:
